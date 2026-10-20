@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0c10">
+    <title>Password Manager v2.0</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<div id="saveNotification" class="save-notification">✅ Сохранено</div>
+
+<!-- Модальное окно ключа -->
+<div id="keyModal" class="modal-overlay">
+    <div class="modal">
+        <h2 style="color:#ff8c2c;">🔐 Ключ шифрования</h2>
+        <p style="margin-bottom: 16px;">Введите ключ для доступа к зашифрованным данным</p>
+        <div class="form-group">
+            <label>Ключ шифрования:</label>
+            <div style="position: relative;">
+                <input type="password" id="modalKeyInput" placeholder="Введите мастер-ключ..." autocomplete="new-password" style="width: 100%; padding-right: 40px;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="toggleKeyVisibility(this)" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 4px 8px;" title="Показать/скрыть ключ" aria-label="Показать или скрыть ключ">👁️</button>
+            </div>
+        </div>
+        <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="saveKey()">💾 Сохранить ключ</button>
+            <button class="btn btn-warning" onclick="closeKeyModal()">Отмена</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования пароля -->
+<div id="passwordModal" class="modal-overlay">
+    <div class="modal">
+        <h2 style="color:#ff8c2c;" id="passwordModalTitle">🔑 Редактирование пароля</h2>
+        <input type="hidden" id="passwordModalEditIndex" value="-1">
+        <div class="form-group">
+            <label>Название *</label>
+            <input type="text" id="passwordModalNameInput" placeholder="Например: База данных" autocomplete="off">
+        </div>
+        <div class="form-row">
+            <div class="form-col">
+                <label>Логин</label>
+                <input type="text" id="passwordModalLoginInput" autocomplete="off">
+            </div>
+            <div class="form-col">
+                <label>Пароль</label>
+                <div style="position: relative;">
+                    <input type="password" id="passwordModalValueInput" autocomplete="new-password" style="width: 100%; padding-right: 40px;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="togglePasswordModalVisibility(this)" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 4px 8px;" title="Показать/скрыть пароль" aria-label="Показать или скрыть пароль">👁️</button>
+                </div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-col">
+                <label>Почта</label>
+                <input type="email" id="passwordModalEmailInput" placeholder="user@example.com" autocomplete="off">
+            </div>
+            <div class="form-col">
+                <label>Группа</label>
+                <input type="text" id="passwordModalGroupInput" placeholder="Выберите или введите новую группу" list="groupsList" autocomplete="off">
+                <datalist id="groupsList"></datalist>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Примечание</label>
+            <textarea id="passwordModalCommentInput" rows="3"></textarea>
+        </div>
+        <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn btn-success" onclick="savePasswordModal()">💾 Сохранить</button>
+            <button class="btn btn-warning" onclick="closePasswordModal()">Отмена</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно с форматом JSON для импорта -->
+<div id="importHelpModal" class="modal-overlay">
+    <div class="modal modal-wide">
+        <h2 style="color:#ff8c2c;">📂 Формат JSON для импорта</h2>
+        <p class="modal-hint">
+            Файл должен содержать массив объектов. Обязательное поле — <code>name</code>,
+            остальные можно не указывать. Такой же файл создаёт кнопка «💾 Выгрузить в JSON».
+        </p>
+        <pre class="json-example">[
+  {
+    "name": "GitHub",
+    "login": "user",
+    "password": "secret",
+    "email": "user@example.com",
+    "comment": "рабочий аккаунт",
+    "group": "Работа"
+  }
+]</pre>
+        <p class="modal-hint">
+            <code>name</code> — название, <code>login</code> — логин, <code>password</code> — пароль,
+            <code>email</code> — почта, <code>comment</code> — примечание, <code>group</code> — группа.
+        </p>
+        <p class="modal-hint modal-warning">⚠ Импорт заменяет все текущие записи.</p>
+        <div class="btn-group" style="margin-top: 20px;">
+            <button class="btn btn-info" onclick="confirmImportJson()">📂 Выбрать файл</button>
+            <button class="btn btn-warning" onclick="closeImportHelpModal()">Отмена</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="app-header">
+        <h1>🔑 Password Manager <span class="version">v2.0</span></h1>
+        <div class="header-actions">
+            <div id="keyStatus" class="key-status inactive">🔓 Ключ не установлен</div>
+            <button class="btn btn-sm btn-info" onclick="openKeyModal()">🔐 Установить ключ</button>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn btn-primary" onclick="showPasswordForm()">➕ Добавить пароль</button>
+        <button class="btn btn-warning" id="refreshPasswordsBtn" onclick="loadPasswords()">🔄 Обновить список</button>
+        <button class="btn btn-success" id="exportJsonBtn" onclick="exportPasswordsJson()">
+            <span class="btn-text">💾 Выгрузить в JSON</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+        </button>
+        <button class="btn btn-info" id="importJsonBtn" onclick="importPasswordsJson()">
+            <span class="btn-text">📂 Загрузить из JSON</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+        </button>
+        <input type="file" id="importPasswordsFile" accept=".json" style="display:none;" onchange="handlePasswordsFileImport(this)">
+    </div>
+    
+    <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="passwordSearchInput" placeholder="Поиск по названию, логину, почте..." autocomplete="off">
+    </div>
+    
+    <div class="table-container">
+        <table id="passwordsTable">
+            <thead>
+                <tr>
+                    <th data-col="name">Название</th>
+                    <th data-col="login">Логин</th>
+                    <th data-col="email">Почта</th>
+                    <th data-col="password">Пароль</th>
+                    <th data-col="comment">Примечание</th>
+                    <th data-col="group">Группа</th>
+                    <th data-col="actions">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="passwordsBody">
+                <tr><td colspan="7" class="empty-state">Нажмите «🔄 Обновить список» для загрузки паролей</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="noResults" class="no-results" hidden>Ничего не найдено</div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
